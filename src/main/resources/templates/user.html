@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8">
+  <title>人脸认证</title>
+  <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+  <script src="https://cdn.bootcss.com/twitter-bootstrap/4.2.1/js/bootstrap.min.js"></script>
+  <link href="https://cdn.bootcss.com/twitter-bootstrap/4.2.1/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    /*最外层容器样式*/
+    .wrap {
+      width: 200px;
+      height: 200px;
+      margin: 200px;
+      left: 800px;
+      top: -400px;
+      position: relative;
+    }
+
+    /*包裹所有容器样式*/
+    .cube {
+      width: 200px;
+      height: 200px;
+      margin: 0 auto;
+      transform-style: preserve-3d;
+      transform: rotateX(-30deg) rotateY(-80deg);
+      animation: rotate linear 20s infinite;
+    }
+
+    @-webkit-keyframes rotate {
+      from {
+        transform: rotateX(0deg) rotateY(0deg);
+      }
+      to {
+        transform: rotateX(360deg) rotateY(360deg);
+      }
+    }
+
+    .cube div {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      opacity: 0.8;
+      transition: all .4s;
+    }
+
+    /*定义所有图片样式*/
+    .pic {
+      width: 200px;
+      height: 200px;
+    }
+
+    .cube .out_front {
+      transform: rotateY(0deg) translateZ(100px);
+    }
+
+    .cube .out_back {
+      transform: translateZ(-100px) rotateY(180deg);
+    }
+
+    .cube .out_left {
+      transform: rotateY(-90deg) translateZ(100px);
+    }
+
+    .cube .out_right {
+      transform: rotateY(90deg) translateZ(100px);
+    }
+
+    .cube .out_top {
+      transform: rotateX(90deg) translateZ(100px);
+    }
+
+    .cube .out_bottom {
+      transform: rotateX(-90deg) translateZ(100px);
+    }
+
+    /*定义小正方体样式*/
+    .cube span {
+      display: block;
+      width: 100px;
+      height: 100px;
+      position: absolute;
+      top: 50px;
+      left: 50px;
+    }
+
+    .cube .in_pic {
+      width: 100px;
+      height: 100px;
+    }
+
+    .cube .in_front {
+      transform: rotateY(0deg) translateZ(50px);
+    }
+
+    .cube .in_back {
+      transform: translateZ(-50px) rotateY(180deg);
+    }
+
+    .cube .in_left {
+      transform: rotateY(-90deg) translateZ(50px);
+    }
+
+    .cube .in_right {
+      transform: rotateY(90deg) translateZ(50px);
+    }
+
+    .cube .in_top {
+      transform: rotateX(90deg) translateZ(50px);
+    }
+
+    .cube .in_bottom {
+      transform: rotateX(-90deg) translateZ(50px);
+    }
+
+    /*鼠标移入后样式*/
+    .cube:hover .out_front {
+      transform: rotateY(0deg) translateZ(200px);
+    }
+
+    .cube:hover .out_back {
+      transform: translateZ(-200px) rotateY(180deg);
+    }
+
+    .cube:hover .out_left {
+      transform: rotateY(-90deg) translateZ(200px);
+    }
+
+    .cube:hover .out_right {
+      transform: rotateY(90deg) translateZ(200px);
+    }
+
+    .cube:hover .out_top {
+      transform: rotateX(90deg) translateZ(200px);
+    }
+
+    .cube:hover .out_bottom {
+      transform: rotateX(-90deg) translateZ(200px);
+    }
+  </style>
+</head>
+
+<body>
+<video width="400" height="300"></video>
+
+<!-- 图像画布 -->
+<canvas width="200" height="150"></canvas>
+<button id="2" onclick="face_login()" class="btn btn-info"><i class="icon-play"></i>&nbsp;登陆</button>
+<button id="3" onclick="Download()" class="btn btn-info"><i class="icon-play"></i>&nbsp;将照片保存到本地</button>
+<button id="4" onclick="faceAdd()" class="btn btn-info"><i class="icon-play"></i>&nbsp;注册</button>
+<script>
+  function $(elem){
+    return document.querySelector(elem);
+  }
+  var canvas = $('canvas'),
+    context = canvas.getContext('2d'),
+    video = $('video'),
+    snap = $('#snap'),
+    upload = $('#upload'),
+    uploaded = $('#uploaded'),
+    mediaStreamTrack;
+  //打开摄像头
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({
+      video: true,
+    }).then(function(stream) {
+      mediaStreamTrack = typeof stream.stop === 'function' ? stream : stream.getTracks()[1];
+      // 旧的浏览器可能没有srcObject
+      if ("srcObject" in video) {
+        video.srcObject = stream;
+      } else {
+        // 防止在新的浏览器里使用它，应为它已经不再支持了
+        video.src = window.URL.createObjectURL(stream);
+      }
+      video.play();
+    });
+  }else if (navigator.getMedia) {
+    navigator.getMedia({
+      video: true
+    }, function(stream) {
+      mediaStreamTrack = stream.getTracks()[0];
+      video.src = (window.URL || window.webkitURL).createObjectURL(stream);
+      video.play();
+    });
+  }
+  //人脸识别参考文档：https://cloud.baidu.com/doc/FACE/
+  function face_login(){
+    context.drawImage(video, 0, 0, 200, 150);
+    jQuery.post('faceLogin', {//指定发送图片到的servlet
+      snapData: canvas.toDataURL('image/jpg')
+    }).done(function(rs) {
+      //对结果集进行解析，判断是否存在人脸
+      console.log(JSON.stringify(rs));
+      if(rs.error_code == "222202"){
+        alert("没有侦测到人脸信息,请重新拍照！");
+      }else if(rs.error_code == "223120") {
+        alert("请正确登录，不得用照片伪造！");
+      }else if(rs.error_code == "222207"){
+        alert("没有找到您的信息，请先注册！")
+      }else if(rs.error_msg == "SUCCESS"){
+        alert("登录成功！");
+      }
+    });
+  }
+/*
+  function face_check(){
+    context.drawImage(video, 0, 0, 200, 150);
+    jQuery.post('faceCheck', { //指定发送图片到的servlet
+      snapData: canvas.toDataURL('image/jpg')
+    }).done(function(rs) {
+      //对结果集进行解析，判断是否存在人脸
+      console.log(JSON.stringify(rs));
+      if(rs.error_code == "222202"){
+        alert("没有人脸信息或人脸数量非1，请重新拍照！");
+      }else if(rs.error_code == "222207"){
+        alert("人脸库中没有您的注册信息，请先注册。");
+      }else if(rs.error_code == "223120"){
+        alert("请正确登录，不得伪造！");
+      }else if(rs.error_msg == "SUCCESS"){
+        context.strokeStyle = "#f00";
+        var face_list = rs.result.face_list;
+        console.dir(face_list);
+        face_list.forEach(function (item,index,array) {
+          var location = item.location;
+          console.dir(location);
+          context.strokeRect(location.left,location.top,location.width,location.height); //在图片中标识出人脸的位置
+        });
+        alert("采集成功！请将照片上传即可体验人脸登录");
+      }
+    });
+  }*/
+
+  function Download() {
+      //cavas 保存图片到本地  js 实现
+      //1.确定图片的类型  获取到的图片格式 data:image/Png;base64,......
+      var type = 'jpg'; //你想要什么图片格式 就选什么吧
+      var imgdata = canvas.toDataURL(type);
+      //2.0 将mime-type改为image/octet-stream,强制让浏览器下载
+      var fixtype = function(type) {
+          type = type.toLocaleLowerCase().replace(/jpg/i, 'jpeg');
+          var r = type.match(/png|jpeg|bmp|gif/)[0];
+          return 'image/' + r;
+      };
+      imgdata = imgdata.replace(fixtype(type), 'image/octet-stream');
+      //3.0 将图片保存到本地
+      var savaFile = function(data, filename) {
+          var save_link = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+          save_link.href = data;
+          save_link.download = filename;
+          var event = document.createEvent('MouseEvents');
+          event.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+          save_link.dispatchEvent(event);
+      };
+      var filename = '图像_' + new Date().getSeconds() + '.' + type;
+      savaFile(imgdata, filename);
+  }
+
+
+  function faceAdd(){
+      context.drawImage(video, 0, 0, 200, 150);
+      jQuery.post('faceAdd', {//指定发送图片到的servlet
+          snapData: canvas.toDataURL('image/jpg')
+      }).done(function(rs) {
+          //对结果集进行解析，判断是否存在上传成功
+          console.log(JSON.stringify(rs));
+          if(rs.error_msg == "faild"){
+              alert("上传失败！")
+          }else if(rs.error_msg == "SUCCESS"){
+              alert("上传成功！");
+          }
+      });
+  }
+
+
+</script>
+
+<!-- 外层最大容器 -->
+<div class="wrap">
+  <!--包裹所有元素的容器-->
+  <div class="cube">
+    <!--前面图片 -->
+    <div class="out_front">
+      <img src="http://dm.kantsuu.com/UploadFiles_4524/201609/20160916072247892.jpg" class="pic" />
+    </div>
+    <!--后面图片 -->
+    <div class="out_back">
+      <img src="http://i1.17173cdn.com/2fhnvk/YWxqaGBf/cms3/fCMfOjblkDADkvv.jpg" class="pic" />
+    </div>
+    <!--左面图片 -->
+    <div class="out_left">
+      <img src="http://img1.gtimg.com/gamezone/pics/hv1/169/81/2129/138459049.jpg" class="pic" />
+    </div>
+    <!--右面图片 -->
+    <div class="out_right">
+      <img src="http://dm.kantsuu.com/UploadFiles_4524/201609/20160916072249522.jpg" class="pic" />
+    </div>
+    <!--上面图片 -->
+    <div class="out_top">
+      <img src="http://img4.imgtn.bdimg.com/it/u=3589082137,168483357&fm=26&gp=0.jpg" class="pic" />
+    </div>
+    <!--下面图片 -->
+    <div class="out_bottom">
+      <img src="http://i1.17173cdn.com/2fhnvk/YWxqaGBf/cms3/yJGPzmblkDADkDC.jpg" class="pic" />
+    </div>
+
+    <!--小正方体 -->
+    <span class="in_front">
+				<img src="http://i10.72g.com/201612/1481008730893.jpg" class="in_pic" />
+			</span>
+    <span class="in_back">
+			     <img src="http://img.18183.com/uploads/allimg/161206/96-161206153325.jpg@q_80" class="in_pic" />
+			</span>
+    <span class="in_left">
+				<img src="http://i10.72g.com/201612/14810087301321.jpg" class="in_pic" />
+			</span>
+    <span class="in_right">
+				<img src="http://i10.72g.com/201612/14810087306108.jpg" class="in_pic" />
+			</span>
+    <span class="in_top">
+				<img src="http://i10.72g.com/201612/14810087303657.jpg" class="in_pic" />
+			</span>
+    <span class="in_bottom">
+				<img src="http://img5.imgtn.bdimg.com/it/u=1202629262,705932271&fm=15&gp=0.jpg" class="in_pic" />
+			</span>
+  </div>
+
+</div>
+
+
+</body>
+</html>
